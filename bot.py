@@ -1,5 +1,4 @@
 import os
-import time
 import telebot
 from instagrapi import Client
 import google.generativeai as genai
@@ -29,7 +28,6 @@ def save_processed_link(link):
 
 def get_new_link_from_telegram():
     try:
-        # Telegram se recent messages uthana
         updates = bot.get_updates(limit=10)
         processed = get_processed_links()
         
@@ -37,7 +35,6 @@ def get_new_link_from_telegram():
             if update.message and update.message.text:
                 text = update.message.text
                 if "instagram.com/reel/" in text or "instagram.com/p/" in text:
-                    # Check if already processed
                     if text not in processed:
                         return text, update.message.chat.id
         return None, None
@@ -64,7 +61,7 @@ def process_and_upload():
     try:
         if chat_id: bot.send_message(chat_id, f"🚀 Nayi link mil gayi! Process shuru kar raha hu...\nLink: {link}")
         
-        # 1. Download Video (1080p Strict High Quality Command)
+        # 1. Download Video
         video_path = "downloaded_video.mp4"
         if chat_id: bot.send_message(chat_id, "⬇️ HD Video download ho rahi hai...")
         os.system(f"yt-dlp -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best' -o {video_path} {link}")
@@ -72,7 +69,7 @@ def process_and_upload():
         if not os.path.exists(video_path):
             raise Exception("Download fail ho gaya! Link check karein.")
 
-        # 2. Edit Video (1.03x speed, color shift, 60fps 1080p, NO TEXT)
+        # 2. Edit Video 
         edited_path = "final_us_video.mp4"
         if chat_id: bot.send_message(chat_id, "🎨 Video edit ho rahi hai (1080p 60FPS, Anti-copyright)...")
         os.system(f'ffmpeg -i {video_path} -filter_complex "[0:v]setpts=0.97*PTS,eq=saturation=1.05[v];[0:a]atempo=1.03[a]" -map "[v]" -map "[a]" -r 60 -c:v libx264 -b:v 8000k -c:a aac {edited_path} -y')
@@ -84,23 +81,25 @@ def process_and_upload():
         if chat_id: bot.send_message(chat_id, "🤖 AI se US Gen-Z caption likhwa raha hu...")
         caption = generate_us_caption()
         
-        # 4. Upload to Instagram (Location: Los Angeles)
-        if chat_id: bot.send_message(chat_id, "📤 Instagram par Los Angeles location ke sath upload kar raha hu... (Isme 1-2 minute lag sakte hain)")
+        # 4. Upload to Instagram (JSON Session ke sath)
+        if chat_id: bot.send_message(chat_id, "📤 Instagram par Los Angeles location ke sath upload kar raha hu...")
         cl = Client()
+        
+        if os.path.exists("session.json"):
+            cl.load_settings("session.json")
+            
         cl.login(INSTA_USERNAME, INSTA_PASSWORD)
+        cl.dump_settings("session.json")
         
-        # US Location setup
         loc = cl.location_search("Los Angeles, California")[0]
-        
-        # Blocking Upload (Jab tak poora upload na ho, script rukegi nahi)
         cl.clip_upload(edited_path, caption, location=loc)
         
-        # 5. Save to Memory & Cleanup
+        # 5. Cleanup
         save_processed_link(link)
         os.remove(video_path)
         os.remove(edited_path)
         
-        if chat_id: bot.send_message(chat_id, "✅ SUCCESS! Reel USA Location ke sath upload ho chuki hai! Ab main wapas so raha hu.")
+        if chat_id: bot.send_message(chat_id, "✅ SUCCESS! Reel upload ho chuki hai!")
         print("Upload Successful!")
         
     except Exception as e:
@@ -110,4 +109,3 @@ def process_and_upload():
 
 if __name__ == "__main__":
     process_and_upload()
-    
