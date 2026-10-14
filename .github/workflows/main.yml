@@ -2,12 +2,19 @@ name: US Insta Bot Runner
 
 on:
   schedule:
-    - cron: '0 22 * * *' 
-  workflow_dispatch:
+    # USA (Los Angeles) ke hisaab se: Subah 9 AM, Dopahar 12 PM, aur Shaam 6 PM
+    # Yeh GitHub ke UTC time ke hisaab se 16:00, 19:00, aur 01:00 hota hai.
+    - cron: '0 1,16,19 * * *'
+  workflow_dispatch: # Yeh aapko "Run workflow" ka button dega testing ke liye
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    
+    # Permission zaroori hai taaki bot memory (processed_links.txt) save kar sake
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -22,6 +29,15 @@ jobs:
           pip install --upgrade pip
           pip install pyTelegramBotAPI yt-dlp moviepy requests instagrapi google-generativeai
 
-      - name: Start The Bot
+      - name: Start The Bot (Process 1 Link)
         run: python bot.py
-        
+
+      - name: Save Memory (Commit Processed Links)
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          git add processed_links.txt
+          # Agar koi nayi link nahi aayi hogi, toh error na aaye isliye echo lagaya hai
+          git commit -m "Auto-saved processed link" || echo "No new links to save"
+          git push
+          
