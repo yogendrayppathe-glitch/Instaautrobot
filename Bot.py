@@ -1,125 +1,104 @@
 import os
-import time
 import telebot
-import yt_dlp
-from moviepy.editor import VideoFileClip, CompositeVideoClip, vfx
-import google.generativeai as genai
 from instagrapi import Client
+import google.generativeai as genai
 
-# Aapki Saari Details (Sab fix hai)
-TELEGRAM_TOKEN = '8985439812:AAG8MOcfiB7Lplr_IjcSu0bet42LJk2oJLw'
-ALLOWED_CHAT_ID = 6649646092
-GEMINI_API_KEY = 'AQ.Ab8RN6J3t8huhvllFs2EgfsrMUJ_a0MLKNYEMZJazJZ6mcV9Yw'
-IG_USERNAME = 'fan_p_age123'
-IG_PASSWORD = 'yp@365637'
+# --- API KEYS (Yahan apne asli details daalein) ---
+TELEGRAM_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN" # Jaise pehle tha 89854...
+INSTA_USERNAME = "fan_p_age123"
+INSTA_PASSWORD = "YOUR_INSTA_PASSWORD" 
+GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
 
+# Setup
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-def send_alert(chat_id, error_msg):
-    try:
-        bot.send_message(chat_id, f"🚨 **ERROR!**\n`{error_msg}`")
-    except:
-        pass
+HISTORY_FILE = "processed_links.txt"
 
-def generate_us_caption(original_title):
-    try:
-        model = genai.GenerativeModel('gemini-pro')
-        prompt = f"Original reel title is: '{original_title}'. Write a very short, engaging Instagram Reel caption for a US Gen-Z audience based on this topic. Don't write on the video, just the caption text. Add 4-5 USA-targeted trending hashtags (like #usa, #losangeles, #viral)."
-        response = model.generate_content(prompt)
-        return response.text.strip()
-    except:
-        return f"{original_title} 🔥👀 #usa #losangeles #viral"
+def get_processed_links():
+    if not os.path.exists(HISTORY_FILE):
+        return []
+    with open(HISTORY_FILE, "r") as f:
+        return f.read().splitlines()
 
-def download_video(url, chat_id):
-    temp_file = "raw_video.mp4"
-    if os.path.exists(temp_file): os.remove(temp_file)
+def save_processed_link(link):
+    with open(HISTORY_FILE, "a") as f:
+        f.write(link + "\n")
+
+def get_new_link():
     try:
-        ydl_opts = {'format': 'best', 'outtmpl': temp_file, 'quiet': True}
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Extract info to get original title
-            info = ydl.extract_info(url, download=True)
-            title = info.get('title', 'Trending Video')
-        return temp_file, title
+        # Telegram se pichle 20 messages layega
+        updates = bot.get_updates(limit=20)
+        processed = get_processed_links()
+        
+        for update in updates:
+            if update.message and update.message.text:
+                text = update.message.text
+                if "instagram.com" in text:
+                    # Agar link ke sath koi aur text bhi ho, toh sirf link nikalega
+                    words = text.split()
+                    for word in words:
+                        if "instagram.com" in word:
+                            if word not in processed:
+                                return word, update.message.chat.id
+        return None, None
     except Exception as e:
-        send_alert(chat_id, f"Download Fail: {str(e)}")
+        print(f"Telegram fetch error: {e}")
         return None, None
 
-def edit_video(video_path, chat_id):
-    try:
-        clip = VideoFileClip(video_path)
-        # Anti-Copyright (Speed & Color) - Purana system active
-        clip = clip.fx(vfx.speedx, 1.03).fx(vfx.colorx, 1.05)
-        
-        # Clean 1080p Canvas without any text overlay
-        W, H = 1080, 1920
-        scaled_clip = clip.resize(width=int(W * 0.95)).set_position(('center', 'center'))
-        
-        final_video = CompositeVideoClip([scaled_clip], size=(W, H)).set_duration(clip.duration)
-        output_file = "ready_for_ig.mp4"
-        
-        # 60FPS HD Render
-        final_video.write_videofile(output_file, fps=60, codec="libx264", bitrate="8000k", threads=4)
-        return output_file
-    except Exception as e:
-        send_alert(chat_id, f"Edit Error: {str(e)}")
-        return None
-
-def upload_to_instagram(video_path, final_caption, chat_id):
-    try:
-        cl = Client()
-        session_file = "session.json"
-        if os.path.exists(session_file):
-            cl.load_settings(session_file)
-            
-        cl.login(IG_USERNAME, IG_PASSWORD)
-        cl.dump_settings(session_file)
-        
-        # Location Tagging (Los Angeles)
-        try:
-            us_location = cl.location_search("Los Angeles, California")[0]
-        except:
-            us_location = None
-            
-        # Uploading with Location and Smart Caption
-        cl.clip_upload(video_path, caption=final_caption, location=us_location)
-        return True
-    except Exception as e:
-        send_alert(chat_id, f"Upload Fail: {str(e)}")
-        return False
-
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    if message.chat.id == ALLOWED_CHAT_ID:
-        bot.reply_to(message, "🇺🇸 US Bot Ready! Insta Reel ka link bhejiye.")
-
-@bot.message_handler(func=lambda message: True)
-def handle_link(message):
-    if message.chat.id != ALLOWED_CHAT_ID: return
-    url = message.text.strip()
+def main():
+    link, chat_id = get_new_link()
     
-    if "instagram.com" not in url:
-        bot.reply_to(message, "❌ Sirf Instagram link bhejein!")
+    if not link:
+        print("Koi nayi Instagram link nahi mili. Queue khali hai.")
         return
-        
-    bot.reply_to(message, "📥 Link received! Processing start...")
-    
-    # 1. Download & Get Original Title
-    raw_vid, original_title = download_video(url, message.chat.id)
-    if not raw_vid: return
-        
-    # 2. AI Creates Caption based on Title
-    bot.reply_to(message, f"🤖 AI original caption padh raha hai: '{original_title}'...")
-    final_caption = generate_us_caption(original_title)
-    
-    # 3. Clean HD Edit
-    bot.reply_to(message, "✂️ Clean Editing Video (1080p 60FPS) Without Text...")
-    final_vid = edit_video(raw_vid, message.chat.id)
-    if not final_vid: return
-        
-    # 4. Upload with US Location
-    bot.reply_to(message, "🚀 Uploading to Instagram with Los Angeles Location...")
-    if upload_to_instagram(final_vid, final_caption, message.chat.id):
-        bot.reply_to(message, "✅ Reel successfully uploaded with USA Location & Hashtags!")
 
-bot.polling(none_stop=True)
+    try:
+        if chat_id: bot.send_message(chat_id, f"🚀 Nayi link mil gayi! Process shuru ho raha hai...\nLink: {link}")
+        
+        # 1. Download Video
+        if chat_id: bot.send_message(chat_id, "⬇️ Video download ho rahi hai...")
+        os.system(f"yt-dlp -o 'downloaded_video.mp4' {link}")
+        
+        if not os.path.exists("downloaded_video.mp4"):
+            raise Exception("Download fail ho gaya! Link check karein.")
+
+        # 2. Edit Video (1.03x speed, color shift, 60fps 1080p, No Text)
+        if chat_id: bot.send_message(chat_id, "🎨 Video edit ho rahi hai (1080p 60FPS, Anti-copyright)...")
+        os.system('ffmpeg -i downloaded_video.mp4 -filter_complex "[0:v]setpts=0.97*PTS,eq=saturation=1.05[v];[0:a]atempo=1.03[a]" -map "[v]" -map "[a]" -r 60 -c:v libx264 -b:v 8000k -c:a aac final_us_video.mp4 -y')
+        
+        if not os.path.exists("final_us_video.mp4"):
+            raise Exception("Video editing (FFmpeg) fail ho gayi.")
+
+        # 3. AI Caption USA Targeted
+        if chat_id: bot.send_message(chat_id, "🤖 AI se US Gen-Z caption likhwa raha hu...")
+        try:
+            prompt = "Write a viral, Gen-Z style Instagram Reel caption targeted for a USA audience. Include popular US hashtags like #LosAngeles #TrendingUSA. Keep it clean and catchy. No emojis at the very beginning."
+            caption = model.generate_content(prompt).text
+        except:
+            caption = "Viral moments everyday! 🔥 #LosAngeles #USA #Trending #FYP"
+
+        # 4. Upload to Instagram (Blocking - wait karega jab tak pura na ho)
+        if chat_id: bot.send_message(chat_id, "📤 Instagram par Los Angeles location ke sath upload ho raha hai... (Isme 1-2 minute lag sakte hain)")
+        cl = Client()
+        cl.login(INSTA_USERNAME, INSTA_PASSWORD)
+        loc = cl.location_search("Los Angeles, California")[0]
+        
+        cl.clip_upload("final_us_video.mp4", caption, location=loc)
+        
+        # 5. Save to Memory & Cleanup
+        save_processed_link(link)
+        os.remove("downloaded_video.mp4")
+        os.remove("final_us_video.mp4")
+        
+        if chat_id: bot.send_message(chat_id, "✅ SUCCESS! Reel USA Location ke sath upload ho chuki hai! Ab main agle alarm tak so raha hu.")
+        print("Upload Successful!")
+        
+    except Exception as e:
+        error_msg = f"❌ ERROR aa gaya:\n{str(e)}"
+        print(error_msg)
+        if chat_id: bot.send_message(chat_id, error_msg)
+
+if __name__ == "__main__":
+    main()
