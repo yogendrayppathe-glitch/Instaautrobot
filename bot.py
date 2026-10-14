@@ -81,10 +81,16 @@ def process_and_upload():
         if chat_id: bot.send_message(chat_id, "🤖 AI se US Gen-Z caption likhwa raha hu...")
         caption = generate_us_caption()
         
-        # 4. Upload to Instagram (Fixed User-Agent + JSON Session)
+                # 4. Upload to Instagram (Fixed User-Agent + JSON Session)
         if chat_id: bot.send_message(chat_id, "📤 Instagram par Los Angeles location ke sath upload kar raha hu...")
         cl = Client()
         
+        # Yeh naya wala dalna hai:
+        cl.set_user_agent("Instagram 303.0.0.35.119 Android (33/13; 420dpi; 1080x2400; Samsung; SM-S918B; kalama; qcom; en_US; 475715632)")
+        
+        if os.path.exists("session.json"):
+            cl.load_settings("session.json")
+            
         # Bypass 'Out of date app' error
         cl.set_user_agent("Instagram 269.0.0.18.75 Android (28/9; 480dpi; 1080x1920; OnePlus; ONEPLUS A6000; OnePlus6; qcom; en_US; 317953222)")
         
