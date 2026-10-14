@@ -84,7 +84,26 @@ def process_and_upload():
                 # 4. Upload to Instagram (Fixed User-Agent + JSON Session)
         if chat_id: bot.send_message(chat_id, "📤 Instagram par Los Angeles location ke sath upload kar raha hu...")
         cl = Client()
+                # Yahi hai client initialization wali line:
+        cl = Client()
         
+        # Iske theek niche yeh dono chizein daal de:
+        cl.set_user_agent("Instagram 303.0.0.35.119 Android (33/13; 420dpi; 1080x2400; Samsung; SM-S918B; kalama; qcom; en_US; 475715632)")
+        cl.set_device({
+            "app_version": "303.0.0.35.119",
+            "android_version": 33,
+            "android_release": "13",
+            "dpi": "420dpi",
+            "resolution": "1080x2400",
+            "manufacturer": "Samsung",
+            "device": "SM-S918B",
+            "model": "kalama",
+            "cpu": "qcom"
+        })
+        
+        if os.path.exists("session.json"):
+            cl.load_settings("session.json")
+            
         # Yeh naya wala dalna hai:
         cl.set_user_agent("Instagram 303.0.0.35.119 Android (33/13; 420dpi; 1080x2400; Samsung; SM-S918B; kalama; qcom; en_US; 475715632)")
         
