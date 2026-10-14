@@ -5,6 +5,9 @@ on:
     - cron: '0 * * * *' 
   workflow_dispatch: 
 
+permissions:
+  contents: write  # <--- Yeh line add karni hai
+
 jobs:
   run-bot:
     runs-on: ubuntu-latest
@@ -30,7 +33,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action Bot"
-          git add processed_links.txt
+          git add processed_links.txt || true
           git add session.json || true
           git commit -m "Auto-saved processed link and session" || echo "No changes to save"
           git push
