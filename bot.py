@@ -85,7 +85,7 @@ def process_and_upload():
         if chat_id: bot.send_message(chat_id, "📤 Instagram par Los Angeles location ke sath upload kar raha hu...")
         cl = Client()
                 # Yahi hai client initialization wali line:
-                cl = Client()
+        cl = Client()
         cl.set_user_agent("Instagram 303.0.0.35.119 Android (33/13; 420dpi; 1080x2400; Samsung; SM-S918B; kalama; qcom; en_US; 475715632)")
         cl.set_device({
             "app_version": "303.0.0.35.119",
