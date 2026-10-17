@@ -81,36 +81,23 @@ def process_and_upload():
         if chat_id: bot.send_message(chat_id, "🤖 AI se US Gen-Z caption likhwa raha hu...")
         caption = generate_us_caption()
         
-                # 4. Upload to Instagram (Clean & Fixed)
+                
+                # 4. Upload to Instagram (Clean Session)
         if chat_id: bot.send_message(chat_id, "📤 Instagram par Los Angeles location ke sath upload kar raha hu...")
         
         cl = Client()
         
-        # Purani session load karte waqt override_app_version=True zaroori hai
+        # Seedha session load karo, koi extra version/device nahi dalna
         if os.path.exists("session.json"):
             cl.load_settings("session.json", override_app_version=True)
             
-        # Samsung S23 Ultra ka device signature aur user-agent
-        cl.set_user_agent("Instagram 303.0.0.35.119 Android (33/13; 420dpi; 1080x2400; Samsung; SM-S918B; kalama; qcom; en_US; 475715632)")
-        cl.set_device({
-            "app_version": "303.0.0.35.119",
-            "version_code": "475715632",
-            "android_version": 33,
-            "android_release": "13",
-            "dpi": "420dpi",
-            "resolution": "1080x2400",
-            "manufacturer": "Samsung",
-            "device": "SM-S918B",
-            "model": "kalama",
-            "cpu": "qcom"
-        })
-        
         cl.login(INSTA_USERNAME, INSTA_PASSWORD)
         cl.dump_settings("session.json")
         
+        # Upload
         loc = cl.location_search("Los Angeles, California")[0]
         cl.clip_upload(edited_path, caption, location=loc)
-            
+        
         # 5. Cleanup
         save_processed_link(link)
         os.remove(video_path)
@@ -118,12 +105,4 @@ def process_and_upload():
         
         if chat_id: bot.send_message(chat_id, "✅ SUCCESS! Reel upload ho chuki hai!")
         print("Upload Successful!")
-        
-    except Exception as e:
-        error_msg = f"❌ ERROR aa gaya:\n{e}"
-        print(error_msg)
-        if chat_id: bot.send_message(chat_id, error_msg)
-
-if __name__ == "__main__":
-    process_and_upload()
         
