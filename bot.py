@@ -97,7 +97,7 @@ def process_and_upload():
         os.system(f"ffmpeg -i {edited_path} -ss 00:00:01 -vframes 1 {thumb_path} -y")
         
         # Upload with LA Coordinates & Thumbnail
-        loc = cl.location_search(34.0522, -118.2437)[0]
+        loc = cl.fbsearch_places("United States")[0]
         cl.clip_upload(edited_path, caption, thumbnail=thumb_path, location=loc)
         
         # 5. Cleanup
