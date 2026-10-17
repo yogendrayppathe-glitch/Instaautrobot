@@ -81,7 +81,7 @@ def process_and_upload():
         if chat_id: bot.send_message(chat_id, "🤖 AI se US Gen-Z caption likhwa raha hu...")
         caption = generate_us_caption()
         
-        # 4. Upload to Instagram (Clean Session)
+        # 4. Upload to Instagram (Clean Session + Auto Thumbnail)
         if chat_id: bot.send_message(chat_id, "📤 Instagram par Los Angeles location ke sath upload kar raha hu...")
         
         cl = Client()
@@ -92,14 +92,20 @@ def process_and_upload():
         cl.login(INSTA_USERNAME, INSTA_PASSWORD)
         cl.dump_settings("session.json")
         
-        # Upload
+        # Video se 1 second ka frame nikal kar auto-thumbnail banao (MoviePy error fix)
+        thumb_path = "thumb.jpg"
+        os.system(f"ffmpeg -i {edited_path} -ss 00:00:01 -vframes 1 {thumb_path} -y")
+        
+        # Upload with LA Coordinates & Thumbnail
         loc = cl.location_search(34.0522, -118.2437)[0]
-        cl.clip_upload(edited_path, caption, location=loc)
+        cl.clip_upload(edited_path, caption, thumbnail=thumb_path, location=loc)
         
         # 5. Cleanup
         save_processed_link(link)
         os.remove(video_path)
         os.remove(edited_path)
+        if os.path.exists(thumb_path):
+            os.remove(thumb_path)
         
         if chat_id: bot.send_message(chat_id, "✅ SUCCESS! Reel upload ho chuki hai!")
         print("Upload Successful!")
@@ -110,3 +116,4 @@ def process_and_upload():
 
 if __name__ == "__main__":
     process_and_upload()
+            
