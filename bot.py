@@ -93,7 +93,7 @@ def process_and_upload():
         cl.dump_settings("session.json")
         
         # Upload
-                loc = cl.location_search(34.0522, -118.2437)[0]
+        loc = cl.location_search(34.0522, -118.2437)[0]
         (edited_path, caption, location=loc)
         
         # 5. Cleanup
