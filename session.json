@@ -17,9 +17,9 @@
         "should_use_header_over_cookies": true
     },
     "cookies": {
-        "sessionid": "40721116836%3ADyWCdRWmX2qihx%3A26%3AAYnvKNTzPsNuNGotuUxZSpkBZmMPfk0aRXzq95W1sw",
         "ds_user_id": "40721116836",
-        "rur": "GTN%2C17841440705100139%2C1793445384%3A01ff5618f07bbf54148715a40165287ad6c378d9e8c21199b2eabb552680032aa0c98670"
+        "rur": "GTN%2C17841440705100139%2C1793447036%3A01ff6577f23303c27251c35e15c1638d130f8e298c48c8893504fb74703f3530f55c302a",
+        "sessionid": "40721116836%3ADyWCdRWmX2qihx%3A26%3AAYnvKNTzPsNuNGotuUxZSpkBZmMPfk0aRXzq95W1sw"
     },
     "last_login": null,
     "device_settings": {
