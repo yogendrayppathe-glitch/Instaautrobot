@@ -105,4 +105,9 @@ def process_and_upload():
         
         if chat_id: bot.send_message(chat_id, "✅ SUCCESS! Reel upload ho chuki hai!")
         print("Upload Successful!")
-        
+
+                except Exception as e:
+            print(f"Error aa gaya: {e}")
+            if chat_id: bot.send_message(chat_id, f"❌ Error: {e}")
+                
+                
