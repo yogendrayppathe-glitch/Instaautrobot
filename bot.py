@@ -93,8 +93,8 @@ def process_and_upload():
         cl.dump_settings("session.json")
         
         # Upload
-        loc = cl.location_search("Los Angeles, California")[0]
-        cl.clip_upload(edited_path, caption, location=loc)
+                loc = cl.location_search(34.0522, -118.2437)[0]
+        (edited_path, caption, location=loc)
         
         # 5. Cleanup
         save_processed_link(link)
