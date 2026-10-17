@@ -81,13 +81,11 @@ def process_and_upload():
         if chat_id: bot.send_message(chat_id, "🤖 AI se US Gen-Z caption likhwa raha hu...")
         caption = generate_us_caption()
         
-                
-                # 4. Upload to Instagram (Clean Session)
+        # 4. Upload to Instagram (Clean Session)
         if chat_id: bot.send_message(chat_id, "📤 Instagram par Los Angeles location ke sath upload kar raha hu...")
         
         cl = Client()
         
-        # Seedha session load karo, koi extra version/device nahi dalna
         if os.path.exists("session.json"):
             cl.load_settings("session.json", override_app_version=True)
             
@@ -106,8 +104,9 @@ def process_and_upload():
         if chat_id: bot.send_message(chat_id, "✅ SUCCESS! Reel upload ho chuki hai!")
         print("Upload Successful!")
 
-                except Exception as e:
-            print(f"Error aa gaya: {e}")
-            if chat_id: bot.send_message(chat_id, f"❌ Error: {e}")
-                
-                
+    except Exception as e:
+        print(f"Error aa gaya: {e}")
+        if chat_id: bot.send_message(chat_id, f"❌ Error: {e}")
+
+if __name__ == "__main__":
+    process_and_upload()
