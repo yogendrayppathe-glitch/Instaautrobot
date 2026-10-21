@@ -78,86 +78,53 @@ def enhance_original_caption(orig_caption):
     hooks = ["Wait for it... 👀", "This is crazy! 🔥", "No way this happened 💀", "Vibes on point ✨", "Thoughts on this? 👇"]
     return f"{clean_orig}\n.\n{random.choice(hooks)}\n.\n{chosen_tags}"
 
-def upload_to_public_host(file_path):
-    """3 Multi-host fallback system taaki public link kabhi fail na ho"""
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-
-    # Host 1: Litterbox (1 hour temporary direct .mp4 link)
-    try:
-        print("Trying Host 1: Litterbox...")
-        with open(file_path, "rb") as f:
-            res = requests.post(
-                "https://litterbox.catbox.moe/resources/internals/api.php",
-                data={"reqtype": "fileupload", "time": "1h"},
-                files={"fileToUpload": f},
-                headers=headers,
-                timeout=120
-            )
-        if res.status_code == 200 and res.text.strip().startswith("https://"):
-            return res.text.strip()
-    except Exception as e:
-        print("Litterbox failed:", e)
-
-    # Host 2: tmpfiles.org (Fast & reliable for GitHub Actions)
-    try:
-        print("Trying Host 2: tmpfiles.org...")
-        with open(file_path, "rb") as f:
-            res = requests.post(
-                "https://tmpfiles.org/api/v1/upload",
-                files={"file": f},
-                headers=headers,
-                timeout=120
-            )
-        if res.status_code == 200:
-            data = res.json()
-            raw_url = data.get("data", {}).get("url", "")
-            if raw_url:
-                # Convert to direct download link by inserting /dl/
-                direct_url = raw_url.replace("tmpfiles.org/", "tmpfiles.org/dl/").replace("http://", "https://")
-                return direct_url
-    except Exception as e:
-        print("tmpfiles failed:", e)
-
-    # Host 3: 0x0.st
-    try:
-        print("Trying Host 3: 0x0.st...")
-        with open(file_path, "rb") as f:
-            res = requests.post(
-                "https://0x0.st",
-                files={"file": f},
-                headers={"User-Agent": "curl/8.0.1"},
-                timeout=120
-            )
-        if res.status_code == 200 and res.text.strip().startswith("https://"):
-            return res.text.strip()
-    except Exception as e:
-        print("0x0.st failed:", e)
-
-    raise Exception("Saare public file hosts fail ho gaye!")
-
-def publish_reel_meta_api(video_url, caption):
-    """Official Meta Graph API se Reel container banata hai aur publish karta hai"""
-    container_url = f"https://graph.facebook.com/v20.0/{IG_USER_ID}/media"
+def publish_reel_meta_direct(file_path, caption):
+    """
+    Bina kisi third-party link ke, seedha Meta ke Official Resumable Upload Server 
+    (rupload.facebook.com) par local MP4 file bhejta hai!
+    """
+    # Step 1: Initialize Resumable Upload Container
+    init_url = f"https://graph.facebook.com/v20.0/{IG_USER_ID}/media"
     payload = {
         "media_type": "REELS",
-        "video_url": video_url,
+        "upload_type": "resumable",
         "caption": caption,
         "location_id": LA_LOCATION_ID,
         "access_token": ACCESS_TOKEN
     }
-    res = requests.post(container_url, data=payload).json()
-    
+    res = requests.post(init_url, data=payload).json()
+
     if "error" in res:
         print("Retrying container without location_id...", res)
         payload.pop("location_id", None)
-        res = requests.post(container_url, data=payload).json()
+        res = requests.post(init_url, data=payload).json()
 
-    if "id" not in res:
-        raise Exception(f"Meta Container Error: {res}")
+    if "id" not in res or "uri" not in res:
+        raise Exception(f"Meta Init Error: {res}")
 
     creation_id = res["id"]
-    print(f"Container Created! ID: {creation_id}. Waiting for Meta to process video...")
+    upload_uri = res["uri"]
+    print(f"Container Initialized! ID: {creation_id}")
 
+    # Step 2: Upload Local Video File Directly to Meta Server
+    file_size = os.path.getsize(file_path)
+    headers = {
+        "Authorization": f"OAuth {ACCESS_TOKEN}",
+        "offset": "0",
+        "file_size": str(file_size),
+        "Content-Type": "application/octet-stream"
+    }
+
+    print(f"Uploading {file_size} bytes directly to Meta server...")
+    with open(file_path, "rb") as f:
+        upload_res = requests.post(upload_uri, headers=headers, data=f, timeout=300).json()
+
+    if not upload_res.get("success"):
+        raise Exception(f"Meta Direct File Upload Failed: {upload_res}")
+
+    print("Video binary uploaded! Waiting for Meta to process...")
+
+    # Step 3: Wait for FINISHED status
     status_url = f"https://graph.facebook.com/v20.0/{creation_id}"
     for attempt in range(25):
         time.sleep(10)
@@ -172,6 +139,7 @@ def publish_reel_meta_api(video_url, caption):
     else:
         raise Exception("Timeout waiting for Meta to process video.")
 
+    # Step 4: Publish the Reel
     publish_url = f"https://graph.facebook.com/v20.0/{IG_USER_ID}/media_publish"
     pub_res = requests.post(publish_url, data={
         "creation_id": creation_id,
@@ -209,9 +177,17 @@ def process_and_upload():
             with open(desc_file, "r", encoding="utf-8", errors="ignore") as f:
                 orig_caption = f.read().strip()
 
-        # 2. Edit Video (FFmpeg Anti-copyright 1080p 60FPS)
-        if chat_id: bot.send_message(chat_id, "🎨 Video edit ho rahi hai (1080p 60FPS)...")
-        os.system(f'ffmpeg -i {video_path} -filter_complex "[0:v]setpts=0.97*PTS,eq=saturation=1.05[v];[0:a]atempo=1.03[a]" -map "[v]" -map "[a]" -r 60 -c:v libx264 -b:v 8000k -c:a aac {edited_path} -y')
+        # 2. Edit Video (Strict Meta Official Reel Specs: H.264, yuv420p, 30FPS, 9:16, 4.5Mbps, AAC 48kHz)
+        if chat_id: bot.send_message(chat_id, "🎨 Video Meta Official specs ke hisaab se edit ho rahi hai...")
+        ffmpeg_cmd = (
+            f'ffmpeg -i {video_path} -filter_complex '
+            f'"[0:v]setpts=0.98*PTS,eq=saturation=1.04,scale=1080:1920:force_original_aspect_ratio=decrease,'
+            f'pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p[v];'
+            f'[0:a]atempo=1.02[a]" '
+            f'-map "[v]" -map "[a]" -r 30 -c:v libx264 -profile:v high -level:v 4.1 -b:v 4500k -maxrate 5000k -bufsize 10000k '
+            f'-c:a aac -b:a 128k -ar 48000 -movflags +faststart {edited_path} -y'
+        )
+        os.system(ffmpeg_cmd)
         
         if not os.path.exists(edited_path):
             raise Exception("Video editing (FFmpeg) fail ho gayi.")
@@ -219,17 +195,12 @@ def process_and_upload():
         # 3. Enhance Original Caption
         if chat_id: bot.send_message(chat_id, "✍️ Video ke original caption ko enhance kiya ja raha hai...")
         final_caption = enhance_original_caption(orig_caption)
-        
-        # 4. Generate Public Link for Meta API
-        if chat_id: bot.send_message(chat_id, "🔗 Video ka temporary public link ban raha hai...")
-        public_video_url = upload_to_public_host(edited_path)
-        print("Public Video URL:", public_video_url)
 
-        # 5. Upload via Official Meta Graph API
-        if chat_id: bot.send_message(chat_id, "📤 Official Meta API se Instagram par upload ho raha hai (30 sec lagenge)...")
-        media_id = publish_reel_meta_api(public_video_url, final_caption)
+        # 4. Direct Upload via Official Meta Resumable API (No third-party host needed!)
+        if chat_id: bot.send_message(chat_id, "📤 Seedha Meta Server par video upload ho rahi hai (30 sec lagenge)...")
+        media_id = publish_reel_meta_direct(edited_path, final_caption)
         
-        # 6. Save & Cleanup
+        # 5. Save & Cleanup
         save_processed_link(link)
         if chat_id: bot.send_message(chat_id, f"✅ SUCCESS! Official API se Reel upload ho gayi!\nPost ID: {media_id}\n\nCaption:\n{final_caption}")
         print("Upload Successful! Media ID:", media_id)
@@ -245,4 +216,4 @@ def process_and_upload():
 
 if __name__ == "__main__":
     process_and_upload()
-
+                
