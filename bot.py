@@ -50,7 +50,6 @@ def get_new_link_from_telegram():
         return None, None
 
 def enhance_original_caption(orig_caption):
-    # Alag-alag US Hashtag sets taaki har baar same hashtags na jaye
     hashtag_sets = [
         "#LosAngeles #ExplorePage #ViralReels #TrendingUSA #CaliforniaVibes #FYP",
         "#USA #LA #DailyVibes #ReelsInstagram #ViralVideos #AmericanLife #TrendingNow",
@@ -59,7 +58,6 @@ def enhance_original_caption(orig_caption):
     ]
     chosen_tags = random.choice(hashtag_sets)
 
-    # Clean original caption (purane kachra hashtags hatao)
     clean_orig = orig_caption.split("#")[0].strip() if orig_caption else "Wait for the end!"
     if not clean_orig:
         clean_orig = orig_caption.strip() if orig_caption else "Unbelievable moment!"
@@ -77,29 +75,68 @@ def enhance_original_caption(orig_caption):
     except Exception as e:
         print("Gemini API skipped, using smart enhanced fallback:", e)
 
-    # Smart Fallback: Agar Gemini key kaam na kare, toh video ka asli caption + random US hooks & tags lagao
     hooks = ["Wait for it... 👀", "This is crazy! 🔥", "No way this happened 💀", "Vibes on point ✨", "Thoughts on this? 👇"]
     return f"{clean_orig}\n.\n{random.choice(hooks)}\n.\n{chosen_tags}"
 
 def upload_to_public_host(file_path):
-    """Edited video ko Catbox par daal kar direct .mp4 public URL nikalta hai (Meta API ke liye)"""
-    print("Uploading video to temporary public host (Catbox)...")
-    url = "https://catbox.moe/user/api.php"
-    with open(file_path, "rb") as f:
-        response = requests.post(
-            url,
-            data={"reqtype": "fileupload"},
-            files={"fileToUpload": f},
-            timeout=120
-        )
-    if response.status_code == 200 and response.text.startswith("https://"):
-        return response.text.strip()
-    else:
-        raise Exception(f"Public link generation failed: {response.text}")
+    """3 Multi-host fallback system taaki public link kabhi fail na ho"""
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+
+    # Host 1: Litterbox (1 hour temporary direct .mp4 link)
+    try:
+        print("Trying Host 1: Litterbox...")
+        with open(file_path, "rb") as f:
+            res = requests.post(
+                "https://litterbox.catbox.moe/resources/internals/api.php",
+                data={"reqtype": "fileupload", "time": "1h"},
+                files={"fileToUpload": f},
+                headers=headers,
+                timeout=120
+            )
+        if res.status_code == 200 and res.text.strip().startswith("https://"):
+            return res.text.strip()
+    except Exception as e:
+        print("Litterbox failed:", e)
+
+    # Host 2: tmpfiles.org (Fast & reliable for GitHub Actions)
+    try:
+        print("Trying Host 2: tmpfiles.org...")
+        with open(file_path, "rb") as f:
+            res = requests.post(
+                "https://tmpfiles.org/api/v1/upload",
+                files={"file": f},
+                headers=headers,
+                timeout=120
+            )
+        if res.status_code == 200:
+            data = res.json()
+            raw_url = data.get("data", {}).get("url", "")
+            if raw_url:
+                # Convert to direct download link by inserting /dl/
+                direct_url = raw_url.replace("tmpfiles.org/", "tmpfiles.org/dl/").replace("http://", "https://")
+                return direct_url
+    except Exception as e:
+        print("tmpfiles failed:", e)
+
+    # Host 3: 0x0.st
+    try:
+        print("Trying Host 3: 0x0.st...")
+        with open(file_path, "rb") as f:
+            res = requests.post(
+                "https://0x0.st",
+                files={"file": f},
+                headers={"User-Agent": "curl/8.0.1"},
+                timeout=120
+            )
+        if res.status_code == 200 and res.text.strip().startswith("https://"):
+            return res.text.strip()
+    except Exception as e:
+        print("0x0.st failed:", e)
+
+    raise Exception("Saare public file hosts fail ho gaye!")
 
 def publish_reel_meta_api(video_url, caption):
     """Official Meta Graph API se Reel container banata hai aur publish karta hai"""
-    # Step 1: Create Media Container
     container_url = f"https://graph.facebook.com/v20.0/{IG_USER_ID}/media"
     payload = {
         "media_type": "REELS",
@@ -110,7 +147,6 @@ def publish_reel_meta_api(video_url, caption):
     }
     res = requests.post(container_url, data=payload).json()
     
-    # Agar location_id par Meta permission roke, toh bina location retry karega
     if "error" in res:
         print("Retrying container without location_id...", res)
         payload.pop("location_id", None)
@@ -122,11 +158,10 @@ def publish_reel_meta_api(video_url, caption):
     creation_id = res["id"]
     print(f"Container Created! ID: {creation_id}. Waiting for Meta to process video...")
 
-    # Step 2: Wait for video processing (Meta takes 15-45 seconds)
     status_url = f"https://graph.facebook.com/v20.0/{creation_id}"
-    for attempt in range(20):
+    for attempt in range(25):
         time.sleep(10)
-        status_res = requests.get(status_url, params={"fields": "status_code", "access_token": ACCESS_TOKEN}).json()
+        status_res = requests.get(status_url, params={"fields": "status_code,status", "access_token": ACCESS_TOKEN}).json()
         status = status_res.get("status_code")
         print(f"Check {attempt+1}: Video Status = {status}")
         
@@ -137,7 +172,6 @@ def publish_reel_meta_api(video_url, caption):
     else:
         raise Exception("Timeout waiting for Meta to process video.")
 
-    # Step 3: Publish Reel
     publish_url = f"https://graph.facebook.com/v20.0/{IG_USER_ID}/media_publish"
     pub_res = requests.post(publish_url, data={
         "creation_id": creation_id,
@@ -163,14 +197,13 @@ def process_and_upload():
     try:
         if chat_id: bot.send_message(chat_id, f"🚀 Nayi link mil gayi! Process shuru...\nLink: {link}")
         
-        # 1. Download Video + Original Caption (--write-description)
+        # 1. Download Video + Original Caption
         if chat_id: bot.send_message(chat_id, "⬇️ HD Video aur uska Asli Caption download ho raha hai...")
         os.system(f"yt-dlp --write-description -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best' -o '{video_path}' '{link}'")
         
         if not os.path.exists(video_path):
             raise Exception("Download fail ho gaya! Link check karein.")
 
-        # Read Original Caption
         orig_caption = ""
         if os.path.exists(desc_file):
             with open(desc_file, "r", encoding="utf-8", errors="ignore") as f:
@@ -206,11 +239,10 @@ def process_and_upload():
         if chat_id: bot.send_message(chat_id, f"❌ Error: {e}")
     
     finally:
-        # Clean up files
         for f_path in [video_path, desc_file, edited_path]:
             if os.path.exists(f_path):
                 os.remove(f_path)
 
 if __name__ == "__main__":
     process_and_upload()
-    
+
