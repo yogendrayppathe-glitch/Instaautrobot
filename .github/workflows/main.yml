@@ -2,12 +2,18 @@ name: US Insta Bot Runner
 
 on:
   schedule:
-    # Slot 1: Subah 8:30 AM EST (Indian Time ke hisaab se shaam ko hota hai, par GitHub UTC par chalta hai)
-    - cron: '30 13 * * *'
-    # Slot 2: Dopahar 1:00 PM EST
-    - cron: '0 18 * * *'
-    # Slot 3: Shaam ko 7:30 PM EST
-    - cron: '30 23 * * *'
+    # --- US Din ke 3 Slots (12 PM, 3 PM, 5 PM LA Time) ---
+    - cron: '0 20 * * *'    # 12:00 PM LA Time (India mein Raat 1:30 AM)
+    - cron: '0 23 * * *'    # 03:00 PM LA Time (India mein Subah 4:30 AM)
+    - cron: '0 1 * * *'     # 05:00 PM LA Time (India mein Subah 6:30 AM)
+
+    # --- US Raat ke 3 Slots (12 AM, 3 AM, 5 AM LA Time) ---
+    - cron: '0 8 * * *'     # 12:00 AM LA Time (India mein Dopahar 1:30 PM)
+    - cron: '0 11 * * *'    # 03:00 AM LA Time (India mein Shaam 4:30 PM)
+    - cron: '0 13 * * *'    # 05:00 AM LA Time (India mein Shaam 6:30 PM)
+
+  workflow_dispatch:
+
     
   workflow_dispatch: 
 
